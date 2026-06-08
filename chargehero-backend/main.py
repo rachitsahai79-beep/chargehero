@@ -2,10 +2,13 @@
 
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, status
+from typing import Dict, Any
+from fastapi import FastAPI, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZIPMiddleware
+from fastapi.responses import JSONResponse
 from config import settings
-from shared.database import db
+from shared.database import get_db_instance, get_db
 
 # Configure logging
 logging.basicConfig(
@@ -20,11 +23,15 @@ async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
     # Startup
     logger.info("Starting ChargeHero Backend API")
-    is_healthy = await db.health_check()
-    if is_healthy:
-        logger.info("Database connection established")
+    db = get_db_instance()
+    if db:
+        is_healthy = db.health_check()
+        if is_healthy:
+            logger.info("Database connection established")
+        else:
+            logger.warning("Database health check failed at startup")
     else:
-        logger.warning("Database health check failed at startup")
+        logger.warning("Failed to initialize database at startup")
 
     yield
 
@@ -49,38 +56,54 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add GZIP middleware (should be last/outermost)
+app.add_middleware(GZIPMiddleware, minimum_size=1000)
+
 
 # Health check endpoint
-@app.get("/health", status_code=status.HTTP_200_OK)
-async def health_check():
+@app.get("/health", response_model=Dict[str, Any])
+async def health_check(db = Depends(get_db)) -> Dict[str, Any]:
     """
     Health check endpoint to verify API and database connectivity.
+    Returns 503 Service Unavailable if database is unhealthy.
 
     Returns:
         dict: Health status information
     """
     try:
-        db_healthy = await db.health_check()
-        return {
-            "status": "healthy" if db_healthy else "degraded",
-            "service": "ChargeHero Backend API",
-            "version": settings.api_version,
-            "database": "connected" if db_healthy else "disconnected",
-        }
+        db_healthy = db.health_check()
+
+        if db_healthy:
+            return {
+                "status": "ok",
+                "environment": settings.environment,
+                "version": settings.api_version
+            }
+        else:
+            # Return 503 when database is unavailable
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content={
+                    "status": "unhealthy",
+                    "environment": settings.environment,
+                    "error": "Database connectivity issue"
+                }
+            )
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        return {
-            "status": "unhealthy",
-            "service": "ChargeHero Backend API",
-            "version": settings.api_version,
-            "database": "error",
-            "error": str(e),
-        }
+        # Log full error, return generic message to client
+        logger.error(f"Health check error: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "status": "unhealthy",
+                "error": "Health check failed"
+            }
+        )
 
 
 # Root endpoint
-@app.get("/")
-async def root():
+@app.get("/", response_model=Dict[str, Any])
+async def root() -> Dict[str, Any]:
     """
     Root endpoint with API information.
 

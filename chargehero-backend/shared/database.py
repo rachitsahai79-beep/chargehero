@@ -2,6 +2,7 @@
 
 from supabase import create_client, Client
 from config import settings
+from fastapi import HTTPException, status
 import logging
 
 logger = logging.getLogger(__name__)
@@ -30,7 +31,7 @@ class SupabaseDB:
         """Get the service role Supabase client for admin operations."""
         return self.service_client
 
-    async def execute_sql(self, query: str, params: dict = None) -> dict:
+    def execute_sql(self, query: str, params: dict = None) -> dict:
         """
         Execute raw SQL query against the database.
 
@@ -49,7 +50,7 @@ class SupabaseDB:
             logger.error(f"Database query failed: {e}")
             raise
 
-    async def health_check(self) -> bool:
+    def health_check(self) -> bool:
         """
         Check if database connection is healthy.
 
@@ -65,10 +66,29 @@ class SupabaseDB:
             return False
 
 
-# Global database instance
-db = SupabaseDB()
+# Lazy-initialize database service on first use
+_db_instance = None
+
+
+def get_db_instance() -> SupabaseDB:
+    """Lazy-initialize database service on first use."""
+    global _db_instance
+    if _db_instance is None:
+        try:
+            _db_instance = SupabaseDB()
+            logger.info("Database service initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {e}")
+            return None
+    return _db_instance
 
 
 def get_db() -> SupabaseDB:
     """Dependency injection function to get the database instance."""
+    db = get_db_instance()
+    if db is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database service unavailable"
+        )
     return db

@@ -1,6 +1,7 @@
 """Configuration management for ChargeHero backend using Pydantic Settings."""
 
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 from typing import List
 
 
@@ -32,7 +33,7 @@ class Settings(BaseSettings):
     api_version: str = "1.0.0"
 
     # CORS Configuration
-    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+    cors_origins: List[str] = []
 
     # Database Configuration
     database_url: str
@@ -45,6 +46,24 @@ class Settings(BaseSettings):
 
     # Logging
     log_level: str = "INFO"
+
+    @field_validator('cors_origins', mode='before')
+    @classmethod
+    def set_cors_origins(cls, v, info):
+        """Set CORS origins based on environment."""
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(',') if origin.strip()]
+
+        if v:  # If explicitly set
+            return v
+
+        # Default based on environment
+        environment = info.data.get('environment', 'development')
+        if environment == 'development':
+            return ['http://localhost:3000', 'http://localhost:8000', 'http://localhost:19006']
+        else:
+            # Production - must be explicitly configured via env var
+            return []
 
     class Config:
         env_file = ".env"

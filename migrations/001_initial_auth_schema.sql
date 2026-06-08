@@ -198,3 +198,98 @@ CREATE TRIGGER auth_engineer_profiles_updated_at BEFORE UPDATE ON auth_engineer_
 
 CREATE TRIGGER auth_customer_profiles_updated_at BEFORE UPDATE ON auth_customer_profiles
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Row Level Security Policies
+-- Enable RLS on all auth tables
+ALTER TABLE auth_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth_engineer_registrations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth_engineer_kyc ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth_engineer_documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth_engineer_training ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth_engineer_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE auth_customer_profiles ENABLE ROW LEVEL SECURITY;
+
+-- Users can only read their own record
+CREATE POLICY users_read_own ON auth_users FOR SELECT
+  USING (auth.uid() = id);
+
+-- Admins can read all users
+CREATE POLICY admins_read_all ON auth_users FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM auth_users WHERE auth.uid() = id AND user_type = 'admin'
+  ));
+
+-- Users can insert their own record (for registration)
+CREATE POLICY users_insert_own ON auth_users FOR INSERT
+  WITH CHECK (auth.uid() = id OR auth.uid() IS NULL);
+
+-- Users can update their own record
+CREATE POLICY users_update_own ON auth_users FOR UPDATE
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
+
+-- Engineer registrations: users can read/write their own
+CREATE POLICY engineer_registrations_read_own ON auth_engineer_registrations FOR SELECT
+  USING (auth.uid() IN (SELECT id FROM auth_users WHERE id = auth_user_id));
+
+-- Admins can read all registrations
+CREATE POLICY engineer_registrations_read_admins ON auth_engineer_registrations FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM auth_users WHERE auth.uid() = id AND user_type = 'admin'
+  ));
+
+-- Engineer KYC: users can read/write their own
+CREATE POLICY engineer_kyc_read_own ON auth_engineer_kyc FOR SELECT
+  USING (auth.uid() IN (SELECT id FROM auth_users WHERE id = auth_user_id));
+
+-- Admins can read all KYC
+CREATE POLICY engineer_kyc_read_admins ON auth_engineer_kyc FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM auth_users WHERE auth.uid() = id AND user_type = 'admin'
+  ));
+
+-- Engineer documents: users can read/write their own
+CREATE POLICY engineer_documents_read_own ON auth_engineer_documents FOR SELECT
+  USING (auth.uid() IN (SELECT id FROM auth_users WHERE id = auth_user_id));
+
+-- Admins can read all documents
+CREATE POLICY engineer_documents_read_admins ON auth_engineer_documents FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM auth_users WHERE auth.uid() = id AND user_type = 'admin'
+  ));
+
+-- Engineer training: users can read/write their own
+CREATE POLICY engineer_training_read_own ON auth_engineer_training FOR SELECT
+  USING (auth.uid() IN (SELECT id FROM auth_users WHERE id = auth_user_id));
+
+-- Admins can read all training
+CREATE POLICY engineer_training_read_admins ON auth_engineer_training FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM auth_users WHERE auth.uid() = id AND user_type = 'admin'
+  ));
+
+-- Engineer profiles: users can read/write their own
+CREATE POLICY engineer_profiles_read_own ON auth_engineer_profiles FOR SELECT
+  USING (auth.uid() IN (SELECT id FROM auth_users WHERE id = auth_user_id));
+
+-- Everyone can read public engineer profiles
+CREATE POLICY engineer_profiles_read_public ON auth_engineer_profiles FOR SELECT
+  USING (TRUE);
+
+-- Engineer profiles: users can update their own
+CREATE POLICY engineer_profiles_update_own ON auth_engineer_profiles FOR UPDATE
+  USING (auth.uid() IN (SELECT id FROM auth_users WHERE id = auth_user_id));
+
+-- Customer profiles: users can read/write their own
+CREATE POLICY customer_profiles_read_own ON auth_customer_profiles FOR SELECT
+  USING (auth.uid() IN (SELECT id FROM auth_users WHERE id = auth_user_id));
+
+-- Admins can read all customer profiles
+CREATE POLICY customer_profiles_read_admins ON auth_customer_profiles FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM auth_users WHERE auth.uid() = id AND user_type = 'admin'
+  ));
+
+-- Customer profiles: users can update their own
+CREATE POLICY customer_profiles_update_own ON auth_customer_profiles FOR UPDATE
+  USING (auth.uid() IN (SELECT id FROM auth_users WHERE id = auth_user_id));
