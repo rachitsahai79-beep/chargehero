@@ -1,0 +1,70 @@
+name: chargehero_engineer_app
+description: ChargeHero Engineer App - EV Charging Service Management
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State management
+  provider: ^6.0.0
+
+  # HTTP & API
+  http: ^1.1.0
+
+  # Database & Storage
+  supabase_flutter: ^1.10.0
+
+  # Authentication
+  jwt_decoder: ^2.0.0
+
+  # UI & Navigation
+  google_maps_flutter: ^2.5.0
+  geolocator: ^10.0.0
+
+  # Camera & Video
+  camera: ^0.10.0
+  video_player: ^2.7.0
+
+  # File & Media
+  image_picker: ^1.0.0
+  signature_pad: ^2.0.0
+
+  # Notifications
+  firebase_core: ^2.24.0
+  firebase_messaging: ^14.6.0
+
+  # UI Components
+  flutter_spinkit: ^5.2.0
+  pull_to_refresh: ^2.0.0
+
+  # Utilities
+  intl: ^0.19.0
+  dio: ^5.3.0
+  flutter_dotenv: ^5.1.0
+  get_it: ^7.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+    - .env
+
+  fonts:
+    - family: Roboto
+      fonts:
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
