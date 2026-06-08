@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from config import settings
 from shared.database import get_db_instance, get_db
 from domains.auth.routes import router as auth_router
+from domains.jobs.routes import router as jobs_router
 
 # Configure logging
 logging.basicConfig(
@@ -62,6 +63,7 @@ app.add_middleware(GZIPMiddleware, minimum_size=1000)
 
 # Include routers
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(jobs_router, prefix="/api/v1/jobs", tags=["jobs"])
 
 
 # Health check endpoint
