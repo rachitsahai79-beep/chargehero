@@ -13,6 +13,7 @@ from domains.auth.routes import router as auth_router
 from domains.jobs.routes import router as jobs_router
 from domains.jobs.checklist_routes import router as checklist_router
 from domains.jobs.service_report_routes import router as service_report_router
+from domains.copilot.copilot_routes import router as copilot_router
 
 # Configure logging
 logging.basicConfig(
@@ -68,6 +69,7 @@ app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(jobs_router, prefix="/api/v1/jobs", tags=["jobs"])
 app.include_router(checklist_router, prefix="/api/v1/jobs", tags=["checklists"])
 app.include_router(service_report_router, prefix="/api/v1/jobs", tags=["service-reports"])
+app.include_router(copilot_router, prefix="/api/v1", tags=["copilot"])
 
 
 # Health check endpoint

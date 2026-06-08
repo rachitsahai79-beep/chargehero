@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
 
+    # AI/Copilot Configuration
+    anthropic_api_key: str = ""
+
     # Logging
     log_level: str = "INFO"
 
