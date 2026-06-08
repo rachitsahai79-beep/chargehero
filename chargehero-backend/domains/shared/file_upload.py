@@ -33,6 +33,35 @@ class FileUploadService:
         self.db = db
         self.bucket_name = bucket_name
 
+    def get_presigned_upload_url(self, file_name: str, file_size_bytes: int, content_type: str, folder: str = 'uploads') -> Optional[str]:
+        """
+        Get presigned URL for generic file upload.
+
+        Args:
+            file_name: Original file name
+            file_size_bytes: File size in bytes
+            content_type: MIME type
+            folder: Folder path in bucket
+
+        Returns:
+            Presigned upload URL or None on error
+        """
+        try:
+            file_id = str(uuid4())[:8]
+            file_path = f"{folder}/{file_id}_{file_name}"
+
+            # Get presigned upload URL (24 hour expiry)
+            presigned_url = self.db.storage.from_(self.bucket_name).create_signed_url(
+                file_path,
+                expires_in=86400  # 24 hours
+            )
+
+            return presigned_url
+
+        except Exception as e:
+            logger.error(f"Error creating presigned URL: {e}")
+            return None
+
     def get_presigned_url_for_photo(self, ticket_id: str, photo_type: str) -> Optional[Dict[str, Any]]:
         """
         Get presigned URL for photo upload (before or after photo).
