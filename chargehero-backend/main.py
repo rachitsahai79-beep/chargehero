@@ -12,6 +12,7 @@ from shared.database import get_db_instance, get_db
 from domains.auth.routes import router as auth_router
 from domains.jobs.routes import router as jobs_router
 from domains.jobs.checklist_routes import router as checklist_router
+from domains.jobs.service_report_routes import router as service_report_router
 
 # Configure logging
 logging.basicConfig(
@@ -66,6 +67,7 @@ app.add_middleware(GZIPMiddleware, minimum_size=1000)
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(jobs_router, prefix="/api/v1/jobs", tags=["jobs"])
 app.include_router(checklist_router, prefix="/api/v1/jobs", tags=["checklists"])
+app.include_router(service_report_router, prefix="/api/v1/jobs", tags=["service-reports"])
 
 
 # Health check endpoint
