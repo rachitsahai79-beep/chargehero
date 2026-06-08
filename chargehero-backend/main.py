@@ -9,6 +9,7 @@ from fastapi.middleware.gzip import GZIPMiddleware
 from fastapi.responses import JSONResponse
 from config import settings
 from shared.database import get_db_instance, get_db
+from domains.auth.routes import router as auth_router
 
 # Configure logging
 logging.basicConfig(
@@ -58,6 +59,9 @@ app.add_middleware(
 
 # Add GZIP middleware (should be last/outermost)
 app.add_middleware(GZIPMiddleware, minimum_size=1000)
+
+# Include routers
+app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
 
 
 # Health check endpoint
