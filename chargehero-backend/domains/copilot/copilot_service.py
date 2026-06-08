@@ -4,6 +4,7 @@ import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 import anthropic
+from domains.copilot.embedding_service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ class CopilotService:
         self.db = db
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = "claude-3-5-sonnet-20241022"
+        self.embedding_service = EmbeddingService(db, api_key)
 
     def query_copilot(self, engineer_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Process a copilot query and return AI-generated response."""
@@ -136,38 +138,17 @@ class CopilotService:
         charger_brand: Optional[str] = None,
         charger_model: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Search knowledge base for relevant items."""
+        """Search knowledge base for relevant items using semantic search."""
         try:
-            # Start with all items
-            items = self.get_knowledge_base_items()
+            # Use semantic search with embeddings
+            results = self.embedding_service.semantic_search(
+                query,
+                charger_brand=charger_brand,
+                charger_model=charger_model,
+                limit=3
+            )
 
-            # Filter by charger brand/model if provided
-            if charger_brand:
-                items = [
-                    i for i in items
-                    if i.get('charger_brand') == charger_brand or i.get('charger_brand') is None
-                ]
-
-            if charger_model:
-                items = [
-                    i for i in items
-                    if i.get('charger_model') == charger_model or i.get('charger_model') is None
-                ]
-
-            # Simple keyword search - in production, use vector similarity
-            query_words = set(query.lower().split())
-            scored_items = []
-
-            for item in items:
-                title_words = set(item['title'].lower().split())
-                content_words = set(item['content'].lower().split())
-                score = len(query_words & title_words) * 2 + len(query_words & content_words)
-                if score > 0:
-                    scored_items.append((item, score))
-
-            # Return top 3 most relevant items
-            scored_items.sort(key=lambda x: x[1], reverse=True)
-            return [item for item, _ in scored_items[:3]]
+            return results
 
         except Exception as e:
             logger.error(f"Error searching knowledge base: {e}")

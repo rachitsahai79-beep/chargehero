@@ -8,6 +8,7 @@ from domains.copilot.copilot_models import (
     KnowledgeBaseCreateRequest, KnowledgeBaseItem, CopilotResponseRequest
 )
 from domains.copilot.copilot_service import CopilotService
+from domains.copilot.embedding_service import EmbeddingService
 from domains.auth.dependencies import get_current_user
 from shared.database import get_db
 from config import settings
@@ -19,6 +20,11 @@ logger = logging.getLogger(__name__)
 def get_copilot_service(db=Depends(get_db)) -> CopilotService:
     """Dependency to get copilot service instance."""
     return CopilotService(db, settings.anthropic_api_key)
+
+
+def get_embedding_service(db=Depends(get_db)) -> EmbeddingService:
+    """Dependency to get embedding service instance."""
+    return EmbeddingService(db, settings.anthropic_api_key)
 
 
 @router.post("/copilot/query", response_model=CopilotQueryResponse, status_code=status.HTTP_201_CREATED)
@@ -153,4 +159,73 @@ async def get_copilot_statistics(
         return stats
     except Exception as e:
         logger.error(f"Error fetching statistics: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch statistics")
+
+
+@router.post("/embeddings/generate/{item_id}")
+async def generate_item_embedding(
+    item_id: str,
+    current_user = Depends(get_current_user),
+    service = Depends(get_embedding_service)
+):
+    """
+    Generate and store embedding for a knowledge base item.
+    Only admins can manage embeddings.
+    """
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Only admins can manage embeddings")
+
+    try:
+        # Get the knowledge base item
+        db = Depends(get_db)
+        response = db.table('copilot_knowledge_base').select('*').eq('id', item_id).execute()
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Knowledge base item not found")
+
+        item = response.data[0]
+        content = f"{item.get('title', '')} {item.get('content', '')}"
+
+        success = service.embed_knowledge_item(item_id, content)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to generate embedding")
+
+        return {'status': 'embedding generated', 'item_id': item_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating embedding: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate embedding")
+
+
+@router.post("/embeddings/bulk-generate")
+async def bulk_generate_embeddings(
+    current_user = Depends(get_current_user),
+    service = Depends(get_embedding_service)
+):
+    """
+    Generate embeddings for all knowledge base items without embeddings.
+    Only admins can trigger this.
+    """
+    if current_user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Only admins can manage embeddings")
+
+    try:
+        result = service.bulk_embed_knowledge_base()
+        return result
+    except Exception as e:
+        logger.error(f"Error in bulk embedding: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate embeddings")
+
+
+@router.get("/embeddings/stats")
+async def get_embedding_stats(
+    current_user = Depends(get_current_user),
+    service = Depends(get_embedding_service)
+):
+    """Get statistics about knowledge base embeddings."""
+    try:
+        stats = service.get_embedding_stats()
+        return stats
+    except Exception as e:
+        logger.error(f"Error fetching embedding stats: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch statistics")
