@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/auth_provider.dart';
 import 'providers/charger_provider.dart';
+import 'providers/ticket_tracking_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 
@@ -18,6 +19,7 @@ class ChargeHeroCustomerApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => ChargerProvider()),
+        ChangeNotifierProvider(create: (_) => TicketTrackingProvider()),
       ],
       child: MaterialApp(
         title: 'ChargeHero Customer',

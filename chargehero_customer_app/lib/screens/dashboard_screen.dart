@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/charger_provider.dart';
+import '../providers/ticket_tracking_provider.dart';
+import 'ticket_details_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -211,7 +213,14 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 backgroundColor: _getStatusColor(ticket.status).withOpacity(0.2),
               ),
               onTap: () {
-                // Navigate to ticket details
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TicketDetailsScreen(
+                      ticketId: ticket.id,
+                    ),
+                  ),
+                );
               },
             ),
           );
