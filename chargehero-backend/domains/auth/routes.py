@@ -56,8 +56,8 @@ async def register(
             detail="Phone number already registered",
         )
 
-    # Send OTP
-    if not auth_service.send_otp(request.phone):
+    # Send OTP (delivered via email when SMTP is configured)
+    if not auth_service.send_otp(request.phone, request.email):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to send OTP",
@@ -160,8 +160,8 @@ async def login(
             detail="User not found",
         )
 
-    # Send OTP
-    if not auth_service.send_otp(request.phone):
+    # Send OTP (delivered via email when SMTP is configured)
+    if not auth_service.send_otp(request.phone, user_reg.get("email")):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to send OTP",

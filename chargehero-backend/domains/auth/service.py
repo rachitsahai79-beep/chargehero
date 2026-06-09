@@ -35,14 +35,19 @@ class AuthService:
         """
         return "".join(random.choices(string.digits, k=6))
 
-    def send_otp(self, phone: str) -> bool:
-        """Send OTP via SMS using Twilio.
+    def send_otp(self, phone: str, email: Optional[str] = None) -> bool:
+        """Generate and deliver an OTP for the given phone number.
+
+        Delivery channel: email (free, via SMTP) when an email address and SMTP
+        credentials are configured. If email is unavailable or sending fails, the
+        OTP is logged (dev mode) so the verification flow still works.
 
         Args:
-            phone: Phone number in format +919876543210
+            phone: Phone number in format +919876543210 (the OTP store key)
+            email: Destination email address for the OTP, if available
 
         Returns:
-            True if OTP sent successfully, False otherwise
+            True if the OTP was generated (and delivered or logged)
         """
         otp = self.generate_otp()
         self._otp_store[phone] = {
@@ -51,16 +56,63 @@ class AuthService:
             "attempts": 0,
         }
 
-        try:
-            # TODO: Integrate Twilio for SMS sending
-            # For now, just log it (in dev/test)
-            logger.info(
-                f"OTP for {phone}: {otp} (DEV MODE - not actually sending SMS)"
-            )
-            return True
-        except Exception as e:
-            logger.error(f"Error sending OTP: {e}")
-            return False
+        # Prefer email delivery when an address and SMTP credentials are present.
+        if email and settings.smtp_user and settings.smtp_password:
+            try:
+                self._send_otp_email(email, otp)
+                logger.info(f"OTP delivered via email to {email} for {phone}")
+                return True
+            except Exception as e:
+                logger.error(f"Failed to send OTP email to {email}: {e}")
+                # Fall through to dev-mode logging so the flow still completes.
+
+        logger.info(
+            f"OTP for {phone}: {otp} "
+            f"(DEV MODE - email not configured or unavailable)"
+        )
+        return True
+
+    def _send_otp_email(self, to_email: str, otp: str) -> None:
+        """Send the OTP to an email address via SMTP.
+
+        Args:
+            to_email: Recipient email address
+            otp: The 6-digit one-time passcode
+
+        Raises:
+            Exception: If the SMTP send fails (caller handles fallback)
+        """
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "Your ChargeHero verification code"
+        msg["From"] = settings.smtp_user
+        msg["To"] = to_email
+
+        text_body = (
+            f"Your ChargeHero verification code is: {otp}\n\n"
+            f"This code expires in 5 minutes. "
+            f"If you did not request it, you can ignore this email."
+        )
+        html_body = (
+            f"<div style='font-family:Arial,sans-serif;max-width:480px;margin:auto'>"
+            f"<h2 style='color:#1a7f37'>ChargeHero</h2>"
+            f"<p>Your verification code is:</p>"
+            f"<p style='font-size:32px;font-weight:bold;letter-spacing:6px;"
+            f"color:#111'>{otp}</p>"
+            f"<p style='color:#666'>This code expires in 5 minutes. "
+            f"If you did not request it, you can ignore this email.</p>"
+            f"</div>"
+        )
+        msg.attach(MIMEText(text_body, "plain"))
+        msg.attach(MIMEText(html_body, "html"))
+
+        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as server:
+            server.starttls()
+            server.login(settings.smtp_user, settings.smtp_password)
+            server.send_message(msg)
 
     def verify_otp(self, phone: str, otp: str) -> bool:
         """Verify OTP and remove from store.
