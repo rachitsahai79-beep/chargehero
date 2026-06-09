@@ -121,7 +121,7 @@ class AuthService:
         """
         try:
             response = (
-                self.db.client.table("auth_engineer_registrations")
+                self.db.service_client.table("auth_engineer_registrations")
                 .insert(
                     {
                         "phone": phone,
@@ -155,7 +155,7 @@ class AuthService:
         """
         try:
             response = (
-                self.db.client.table("auth_engineer_registrations")
+                self.db.service_client.table("auth_engineer_registrations")
                 .select("*")
                 .eq("id", registration_id)
                 .execute()
@@ -179,7 +179,7 @@ class AuthService:
         """
         try:
             response = (
-                self.db.client.table("auth_engineer_registrations")
+                self.db.service_client.table("auth_engineer_registrations")
                 .select("*")
                 .eq("phone", phone)
                 .execute()
@@ -206,7 +206,7 @@ class AuthService:
         """
         try:
             response = (
-                self.db.client.table("auth_engineer_registrations")
+                self.db.service_client.table("auth_engineer_registrations")
                 .update(data)
                 .eq("id", registration_id)
                 .execute()

@@ -45,7 +45,7 @@ async def register(
 
     # Check if phone/email already registered
     existing = (
-        db.client.table("auth_engineer_registrations")
+        db.service_client.table("auth_engineer_registrations")
         .select("id")
         .eq("phone", request.phone)
         .execute()
@@ -115,7 +115,7 @@ async def verify_otp_registration(
 
     # Get registration
     reg_response = (
-        db.client.table("auth_engineer_registrations")
+        db.service_client.table("auth_engineer_registrations")
         .select("id, status")
         .eq("phone", request.phone)
         .execute()
