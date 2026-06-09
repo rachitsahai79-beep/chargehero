@@ -173,9 +173,16 @@ class AuthProvider with ChangeNotifier {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         _token = data['access_token'];
-
-        // Get user info
-        await _fetchUser();
+        // Build the user from the login response. The backend returns
+        // user_id and role here; there is no separate /auth/me endpoint.
+        _user = User(
+          id: data['user_id']?.toString() ?? '',
+          name: '',
+          email: '',
+          phone: phone,
+          role: data['role']?.toString() ?? 'customer',
+          createdAt: DateTime.now(),
+        );
         return true;
       } else {
         final data = jsonDecode(response.body);
@@ -189,30 +196,6 @@ class AuthProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
-  }
-
-  /// Fetch current user info
-  Future<void> _fetchUser() async {
-    if (_token == null) return;
-
-    try {
-      final url = Uri.parse('${Config.apiBaseUrl}/auth/me');
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': 'Bearer $_token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        _user = User.fromJson(data);
-      }
-    } catch (e) {
-      _error = e.toString();
-    }
-
-    notifyListeners();
   }
 
   /// Logout
