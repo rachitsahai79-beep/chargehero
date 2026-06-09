@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from typing import Dict, Any
 from fastapi import FastAPI, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZIPMiddleware
+from starlette.middleware.gzip import GZIPMiddleware
 from fastapi.responses import JSONResponse
 from config import settings
 from shared.database import get_db_instance, get_db

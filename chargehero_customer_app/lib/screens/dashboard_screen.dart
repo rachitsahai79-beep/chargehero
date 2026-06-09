@@ -95,7 +95,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.ev_charger,
+              Icons.electrical_services,
               size: 64,
               color: Colors.grey.shade300,
             ),
@@ -125,7 +125,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             margin: const EdgeInsets.symmetric(vertical: 8),
             child: ListTile(
               leading: Icon(
-                Icons.ev_charger,
+                Icons.electrical_services,
                 color: charger.status == 'active' ? Colors.green : Colors.grey,
               ),
               title: Text('${charger.brand} ${charger.model}'),

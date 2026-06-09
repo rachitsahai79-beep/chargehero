@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:math' as math;
 import '../config.dart';
 
 class EngineerLocation {
@@ -148,13 +149,13 @@ class TicketTrackingProvider with ChangeNotifier {
     double lon2,
   ) {
     const p = 0.017453292519943295; // Math.PI / 180
-    final c = cos((lat2 - lat1) * p / 2);
+    final c = math.cos((lat2 - lat1) * p / 2);
     return 12742 *
-        asin(sqrt(sin((lat2 - lat1) * p / 2) * sin((lat2 - lat1) * p / 2) +
-            cos(lat1 * p) *
-                cos(lat2 * p) *
-                sin((lon2 - lon1) * p / 2) *
-                sin((lon2 - lon1) * p / 2)));
+        math.asin(math.sqrt(math.sin((lat2 - lat1) * p / 2) * math.sin((lat2 - lat1) * p / 2) +
+            math.cos(lat1 * p) *
+                math.cos(lat2 * p) *
+                math.sin((lon2 - lon1) * p / 2) *
+                math.sin((lon2 - lon1) * p / 2)));
   }
 
   /// Clear error
@@ -163,14 +164,3 @@ class TicketTrackingProvider with ChangeNotifier {
     notifyListeners();
   }
 }
-
-// Helper functions for distance calculation
-import 'dart:math';
-
-double cos(double x) => math.cos(x);
-double sin(double x) => math.sin(x);
-double asin(double x) => math.asin(x);
-double sqrt(double x) => math.sqrt(x);
-
-// Import math as alias
-import 'dart:math' as math;
