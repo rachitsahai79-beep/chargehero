@@ -31,6 +31,7 @@ dependencies:
   # UI/UX
   google_maps_flutter: ^2.5.0
   flutter_map: ^6.0.0
+  latlong2: ^0.9.0
   geolocator: ^9.0.2
 
   # Image Handling

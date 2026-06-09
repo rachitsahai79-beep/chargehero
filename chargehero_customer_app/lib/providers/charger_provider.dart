@@ -29,12 +29,12 @@ class Charger {
   factory Charger.fromJson(Map<String, dynamic> json) {
     return Charger(
       id: json['id'],
-      serialNumber: json['serial_number'],
-      model: json['model'],
-      brand: json['brand'],
+      serialNumber: json['serial_number'] ?? '',
+      model: json['model'] ?? '',
+      brand: json['brand'] ?? '',
       address: json['address'] ?? '',
-      latitude: (json['location']?[0] as num?)?.toDouble() ?? 0.0,
-      longitude: (json['location']?[1] as num?)?.toDouble() ?? 0.0,
+      latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
       status: json['status'] ?? 'active',
       createdAt: DateTime.parse(json['created_at']),
     );
@@ -91,13 +91,14 @@ class ChargerProvider with ChangeNotifier {
   String? get error => _error;
 
   /// Fetch customer's chargers
-  Future<void> fetchChargers(String token) async {
+  Future<void> fetchChargers(String token, String customerId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final url = Uri.parse('${Config.apiBaseUrl}/chargers');
+      final url =
+          Uri.parse('${Config.apiBaseUrl}/jobs/customers/$customerId/chargers');
       final response = await http.get(
         url,
         headers: {
@@ -119,33 +120,15 @@ class ChargerProvider with ChangeNotifier {
     }
   }
 
-  /// Fetch customer's tickets
+  /// Fetch customer's tickets.
+  ///
+  /// NOTE: the backend currently exposes only GET /jobs/tickets/{id} (single
+  /// ticket) and no "list my tickets" endpoint. Until that endpoint exists,
+  /// this is a no-op; the Tickets tab shows tickets raised in this session
+  /// (added by [raiseTicket] from the create response).
   Future<void> fetchTickets(String token) async {
-    _isLoading = true;
-    _error = null;
+    // Intentionally no network call - see note above.
     notifyListeners();
-
-    try {
-      final url = Uri.parse('${Config.apiBaseUrl}/tickets');
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as List;
-        _tickets = data.map((item) => Ticket.fromJson(item)).toList();
-      } else {
-        _error = 'Failed to fetch tickets';
-      }
-    } catch (e) {
-      _error = e.toString();
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
   }
 
   /// Raise a new ticket
@@ -161,7 +144,8 @@ class ChargerProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final url = Uri.parse('${Config.apiBaseUrl}/tickets');
+      final url =
+          Uri.parse('${Config.apiBaseUrl}/jobs/chargers/$chargerId/tickets');
       final response = await http.post(
         url,
         headers: {
@@ -176,8 +160,10 @@ class ChargerProvider with ChangeNotifier {
         }),
       );
 
-      if (response.statusCode == 201) {
-        await fetchTickets(token);
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        // No list endpoint exists; add the created ticket to the local list.
+        final data = jsonDecode(response.body);
+        _tickets.insert(0, Ticket.fromJson(data));
         return true;
       } else {
         final data = jsonDecode(response.body);
@@ -196,17 +182,20 @@ class ChargerProvider with ChangeNotifier {
   /// Register a new charger
   Future<bool> registerCharger({
     required String token,
+    required String customerId,
     required String serialNumber,
     required String model,
     required String brand,
     required String address,
+    required double latitude,
+    required double longitude,
   }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final url = Uri.parse('${Config.apiBaseUrl}/chargers');
+      final url = Uri.parse('${Config.apiBaseUrl}/jobs/chargers');
       final response = await http.post(
         url,
         headers: {
@@ -218,11 +207,13 @@ class ChargerProvider with ChangeNotifier {
           'model': model,
           'brand': brand,
           'address': address,
+          'latitude': latitude,
+          'longitude': longitude,
         }),
       );
 
-      if (response.statusCode == 201) {
-        await fetchChargers(token);
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        await fetchChargers(token, customerId);
         return true;
       } else {
         final data = jsonDecode(response.body);

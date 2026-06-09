@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:latlong2/latlong.dart';
 import '../providers/auth_provider.dart';
 import '../providers/charger_provider.dart';
 import '../providers/ticket_tracking_provider.dart';
 import 'ticket_details_screen.dart';
+import 'location_picker_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -24,8 +26,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
       final authProvider = context.read<AuthProvider>();
       final chargerProvider = context.read<ChargerProvider>();
 
-      if (authProvider.token != null) {
-        chargerProvider.fetchChargers(authProvider.token!);
+      if (authProvider.token != null && authProvider.user != null) {
+        chargerProvider.fetchChargers(authProvider.token!, authProvider.user!.id);
         chargerProvider.fetchTickets(authProvider.token!);
       }
     });
@@ -115,7 +117,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     }
 
     return RefreshIndicator(
-      onRefresh: () => chargerProvider.fetchChargers(authProvider.token!),
+      onRefresh: () =>
+          chargerProvider.fetchChargers(authProvider.token!, authProvider.user!.id),
       child: ListView.builder(
         padding: const EdgeInsets.all(12),
         itemCount: chargerProvider.chargers.length,
@@ -234,78 +237,113 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     final modelController = TextEditingController();
     final brandController = TextEditingController();
     final addressController = TextEditingController();
+    LatLng? pickedLocation;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Register Charger'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: serialController,
-                decoration: InputDecoration(
-                  labelText: 'Serial Number',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Register Charger'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: serialController,
+                  decoration: InputDecoration(
+                    labelText: 'Serial Number',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: brandController,
-                decoration: InputDecoration(
-                  labelText: 'Brand',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: brandController,
+                  decoration: InputDecoration(
+                    labelText: 'Brand',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: modelController,
-                decoration: InputDecoration(
-                  labelText: 'Model',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: modelController,
+                  decoration: InputDecoration(
+                    labelText: 'Model',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: addressController,
-                decoration: InputDecoration(
-                  labelText: 'Address',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: addressController,
+                  decoration: InputDecoration(
+                    labelText: 'Address',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  maxLines: 2,
                 ),
-                maxLines: 3,
-              ),
-            ],
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.location_on),
+                  label: Text(
+                    pickedLocation == null
+                        ? 'Pick location on map'
+                        : 'Location: ${pickedLocation!.latitude.toStringAsFixed(4)}, ${pickedLocation!.longitude.toStringAsFixed(4)}',
+                  ),
+                  onPressed: () async {
+                    final result = await Navigator.of(dialogContext).push<LatLng>(
+                      MaterialPageRoute(
+                        builder: (_) => LocationPickerScreen(initial: pickedLocation),
+                      ),
+                    );
+                    if (result != null) {
+                      setDialogState(() => pickedLocation = result);
+                    }
+                  },
+                ),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final authProvider = context.read<AuthProvider>();
-              final chargerProvider = context.read<ChargerProvider>();
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (pickedLocation == null) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(content: Text('Please pick the charger location on the map')),
+                  );
+                  return;
+                }
+                final authProvider = context.read<AuthProvider>();
+                final chargerProvider = context.read<ChargerProvider>();
 
-              final success = await chargerProvider.registerCharger(
-                token: authProvider.token!,
-                serialNumber: serialController.text,
-                model: modelController.text,
-                brand: brandController.text,
-                address: addressController.text,
-              );
-
-              if (success && mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Charger registered successfully')),
+                final success = await chargerProvider.registerCharger(
+                  token: authProvider.token!,
+                  customerId: authProvider.user!.id,
+                  serialNumber: serialController.text.trim(),
+                  model: modelController.text.trim(),
+                  brand: brandController.text.trim(),
+                  address: addressController.text.trim(),
+                  latitude: pickedLocation!.latitude,
+                  longitude: pickedLocation!.longitude,
                 );
-              }
-            },
-            child: const Text('Register'),
-          ),
-        ],
+
+                if (success && mounted) {
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Charger registered successfully')),
+                  );
+                } else if (mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content: Text(chargerProvider.error ?? 'Failed to register charger')),
+                  );
+                }
+              },
+              child: const Text('Register'),
+            ),
+          ],
+        ),
       ),
     );
   }
