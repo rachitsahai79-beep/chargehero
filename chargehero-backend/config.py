@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
 
+    # Resend HTTP email API (works where SMTP ports are blocked, e.g. Railway).
+    # Preferred over SMTP when resend_api_key is set.
+    resend_api_key: str = ""
+    email_from: str = "ChargeHero <onboarding@resend.dev>"
+
     # AI/Copilot Configuration
     anthropic_api_key: str = ""
 

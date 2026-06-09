@@ -56,8 +56,12 @@ class AuthService:
             "attempts": 0,
         }
 
-        # Prefer email delivery when an address and SMTP credentials are present.
-        if email and settings.smtp_user and settings.smtp_password:
+        # Deliver by email when configured (Resend HTTP API preferred; SMTP fallback).
+        email_configured = bool(
+            settings.resend_api_key
+            or (settings.smtp_user and settings.smtp_password)
+        )
+        if email and email_configured:
             try:
                 self._send_otp_email(email, otp)
                 logger.info(f"OTP delivered via email to {email} for {phone}")
@@ -73,25 +77,20 @@ class AuthService:
         return True
 
     def _send_otp_email(self, to_email: str, otp: str) -> None:
-        """Send the OTP to an email address via SMTP.
+        """Send the OTP to an email address.
+
+        Uses the Resend HTTP API (port 443) when RESEND_API_KEY is set, which
+        works on PaaS networks that block SMTP ports (e.g. Railway). Falls back
+        to SMTP otherwise.
 
         Args:
             to_email: Recipient email address
             otp: The 6-digit one-time passcode
 
         Raises:
-            Exception: If the SMTP send fails (caller handles fallback)
+            Exception: If sending fails (caller handles fallback to logging)
         """
-        import smtplib
-        import socket
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Your ChargeHero verification code"
-        msg["From"] = settings.smtp_user
-        msg["To"] = to_email
-
+        subject = "Your ChargeHero verification code"
         text_body = (
             f"Your ChargeHero verification code is: {otp}\n\n"
             f"This code expires in 5 minutes. "
@@ -107,14 +106,56 @@ class AuthService:
             f"If you did not request it, you can ignore this email.</p>"
             f"</div>"
         )
+
+        if settings.resend_api_key:
+            self._send_via_resend(to_email, subject, html_body, text_body)
+        else:
+            self._send_via_smtp(to_email, subject, html_body, text_body)
+
+    @staticmethod
+    def _send_via_resend(
+        to_email: str, subject: str, html_body: str, text_body: str
+    ) -> None:
+        """Send email through the Resend HTTP API (HTTPS, port 443)."""
+        import httpx
+
+        response = httpx.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {settings.resend_api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "from": settings.email_from,
+                "to": [to_email],
+                "subject": subject,
+                "html": html_body,
+                "text": text_body,
+            },
+            timeout=15,
+        )
+        if response.status_code >= 400:
+            raise Exception(
+                f"Resend API error {response.status_code}: {response.text}"
+            )
+
+    @staticmethod
+    def _send_via_smtp(
+        to_email: str, subject: str, html_body: str, text_body: str
+    ) -> None:
+        """Send email via SMTP (fallback). Forces IPv4 to avoid IPv6 routing errors."""
+        import smtplib
+        import socket
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = settings.smtp_user
+        msg["To"] = to_email
         msg.attach(MIMEText(text_body, "plain"))
         msg.attach(MIMEText(html_body, "html"))
 
-        # Force IPv4 resolution for the SMTP connection. On some PaaS networks
-        # (e.g. Railway) the host advertises IPv6 but has no usable IPv6 route,
-        # causing "[Errno 101] Network is unreachable". We temporarily restrict
-        # getaddrinfo to AF_INET so smtplib connects over IPv4, while TLS still
-        # uses the real hostname for certificate verification.
         _orig_getaddrinfo = socket.getaddrinfo
 
         def _ipv4_only(host, port, family=0, type=0, proto=0, flags=0):
