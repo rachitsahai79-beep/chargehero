@@ -54,11 +54,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add CORS middleware
+# Add CORS middleware.
+# Allow all origins for the testing/MVP phase so the Flutter app works from
+# web (any localhost port) and mobile. Auth uses the Authorization Bearer
+# header (not cookies), so credentials mode is not required.
+# PRODUCTION: restrict allow_origins to known frontend origins and, if cookie
+# auth is ever added, set allow_credentials=True with explicit origins.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
