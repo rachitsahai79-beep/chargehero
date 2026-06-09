@@ -2,7 +2,6 @@
 
 from fastapi import HTTPException, status, Depends
 from fastapi.security import HTTPBearer
-from starlette.authentication import HTTPAuthCredentials
 from domains.auth.service import AuthService
 from shared.database import get_db, SupabaseDB
 from typing import Dict, Any
@@ -11,7 +10,7 @@ security = HTTPBearer()
 
 
 async def get_current_user(
-    credentials: HTTPAuthCredentials = Depends(security),
+    credentials = Depends(security),
     db: SupabaseDB = Depends(get_db),
 ) -> Dict[str, Any]:
     """
