@@ -1,7 +1,8 @@
 """Dependency injection for authentication domain."""
 
 from fastapi import HTTPException, status, Depends
-from fastapi.security import HTTPBearer, HTTPAuthCredentials
+from fastapi.security import HTTPBearer
+from starlette.authentication import HTTPAuthCredentials
 from domains.auth.service import AuthService
 from shared.database import get_db, SupabaseDB
 from typing import Dict, Any
