@@ -11,15 +11,47 @@ logger = logging.getLogger(__name__)
 class SupabaseDB:
     """Wrapper around Supabase client for database operations."""
 
+    @staticmethod
+    def _clean(value: str) -> str:
+        """Strip whitespace and stray surrounding quotes from a config value."""
+        if value is None:
+            return ""
+        return value.strip().strip('"').strip("'").strip()
+
     def __init__(self):
         """Initialize Supabase client with credentials from settings."""
+        # Normalize URL: drop trailing slash and any accidental /rest/v1 suffix
+        url = self._clean(settings.supabase_url)
+        if url.endswith("/rest/v1/") or url.endswith("/rest/v1"):
+            url = url.split("/rest/v1")[0]
+        url = url.rstrip("/")
+
+        anon_key = self._clean(settings.supabase_anon_key)
+        service_key = self._clean(settings.supabase_service_role_key)
+
+        # Diagnostic: log key FORMAT only (prefix + length), never the full secret.
+        # A valid Supabase JWT starts with "eyJ"; the new key format starts with "sb_".
+        logger.info(
+            "Supabase config -> url=%s | anon_prefix=%r anon_len=%d | service_prefix=%r service_len=%d",
+            url,
+            anon_key[:4],
+            len(anon_key),
+            service_key[:4],
+            len(service_key),
+        )
+        if not anon_key.startswith("eyJ"):
+            logger.warning(
+                "SUPABASE_ANON_KEY does not look like a JWT (expected to start with 'eyJ'). "
+                "supabase==2.0.0 requires the legacy JWT key, not the new sb_publishable_ key."
+            )
+
         self.client: Client = create_client(
-            supabase_url=settings.supabase_url,
-            supabase_key=settings.supabase_anon_key,
+            supabase_url=url,
+            supabase_key=anon_key,
         )
         self.service_client: Client = create_client(
-            supabase_url=settings.supabase_url,
-            supabase_key=settings.supabase_service_role_key,
+            supabase_url=url,
+            supabase_key=service_key,
         )
         logger.info("Supabase client initialized")
 
