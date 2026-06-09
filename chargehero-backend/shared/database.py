@@ -39,15 +39,34 @@ class SupabaseDB:
             service_key[:4],
             len(service_key),
         )
+        # supabase==2.0.0 only accepts legacy JWT keys (they start with "eyJ").
+        # The newer "sb_publishable_" / "sb_secret_" keys are rejected with
+        # "Invalid API key". If the anon key is not a JWT but the service key
+        # is, fall back to the service key so the backend can still start.
+        # This backend performs its own authorization via JWT_SECRET, so using
+        # the service-role key for the anon client is acceptable as a stopgap.
+        effective_anon_key = anon_key
         if not anon_key.startswith("eyJ"):
-            logger.warning(
-                "SUPABASE_ANON_KEY does not look like a JWT (expected to start with 'eyJ'). "
-                "supabase==2.0.0 requires the legacy JWT key, not the new sb_publishable_ key."
-            )
+            if service_key.startswith("eyJ"):
+                logger.warning(
+                    "SUPABASE_ANON_KEY is not a legacy JWT (prefix=%r); falling back to "
+                    "SUPABASE_SERVICE_ROLE_KEY for the anon client. To restore "
+                    "least-privilege access, set SUPABASE_ANON_KEY to the legacy anon JWT.",
+                    anon_key[:4],
+                )
+                effective_anon_key = service_key
+            else:
+                logger.error(
+                    "Neither SUPABASE_ANON_KEY nor SUPABASE_SERVICE_ROLE_KEY is a legacy "
+                    "JWT (anon prefix=%r, service prefix=%r). supabase==2.0.0 cannot "
+                    "authenticate with the new sb_ key format.",
+                    anon_key[:4],
+                    service_key[:4],
+                )
 
         self.client: Client = create_client(
             supabase_url=url,
-            supabase_key=anon_key,
+            supabase_key=effective_anon_key,
         )
         self.service_client: Client = create_client(
             supabase_url=url,
