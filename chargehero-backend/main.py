@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from typing import Dict, Any
 from fastapi import FastAPI, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.gzip import GZIPMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from config import settings
 from shared.database import get_db_instance, get_db
@@ -64,7 +64,7 @@ app.add_middleware(
 )
 
 # Add GZIP middleware (should be last/outermost)
-app.add_middleware(GZIPMiddleware, minimum_size=1000)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Include routers
 app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
