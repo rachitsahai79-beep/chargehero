@@ -7,6 +7,6 @@
     "startCommand": "/bin/sh -c \"python -m uvicorn main:app --host 0.0.0.0 --port $PORT\"",
     "restartPolicyType": "always",
     "healthcheckPath": "/health",
-    "healthcheckTimeout": 10
+    "healthcheckTimeout": 300
   }
 }
