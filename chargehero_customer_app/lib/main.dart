@@ -5,6 +5,7 @@ import 'providers/charger_provider.dart';
 import 'providers/ticket_tracking_provider.dart';
 import 'providers/checklist_provider.dart';
 import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
 import 'screens/dashboard_screen.dart';
 
 void main() {
@@ -38,6 +39,7 @@ class ChargeHeroCustomerApp extends StatelessWidget {
         ),
         routes: {
           '/login': (context) => const LoginScreen(),
+          '/register': (context) => const RegisterScreen(),
           '/home': (context) => const DashboardScreen(),
         },
       ),

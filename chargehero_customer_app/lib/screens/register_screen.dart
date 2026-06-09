@@ -2,28 +2,47 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+/// Customer registration: collects phone/email/name/DOB, requests an OTP,
+/// then verifies it. On success the user is sent to the login screen to sign in.
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({Key? key}) : super(key: key);
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _nameController = TextEditingController();
   final _otpController = TextEditingController();
+  DateTime? _dob;
   bool _showOTP = false;
 
   @override
   void dispose() {
     _phoneController.dispose();
+    _emailController.dispose();
+    _nameController.dispose();
     _otpController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickDob() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(now.year - 25, 1, 1),
+      firstDate: DateTime(1940),
+      lastDate: now,
+    );
+    if (picked != null) setState(() => _dob = picked);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(title: const Text('Create Account')),
       body: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {
           return SingleChildScrollView(
@@ -31,26 +50,18 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const SizedBox(height: 80),
-                Icon(
-                  Icons.bolt,
-                  size: 64,
-                  color: Colors.blue.shade600,
-                ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
+                Icon(Icons.bolt, size: 56, color: Colors.blue.shade600),
+                const SizedBox(height: 16),
                 Text(
-                  'ChargeHero',
-                  style: Theme.of(context).textTheme.headlineLarge,
+                  _showOTP ? 'Verify your email' : 'Register',
+                  style: Theme.of(context).textTheme.headlineMedium,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Customer App',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 48),
-                if (!_showOTP) _buildPhoneInput(context, authProvider) else _buildOTPInput(context, authProvider),
+                const SizedBox(height: 32),
+                if (!_showOTP)
+                  _buildForm(context, authProvider)
+                else
+                  _buildOTPInput(context, authProvider),
                 const SizedBox(height: 24),
                 if (authProvider.error != null)
                   Container(
@@ -85,7 +96,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildPhoneInput(BuildContext context, AuthProvider authProvider) {
+  Widget _buildForm(BuildContext context, AuthProvider authProvider) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -94,13 +105,52 @@ class _LoginScreenState extends State<LoginScreen> {
           decoration: InputDecoration(
             labelText: 'Phone Number',
             hintText: '+919876543210',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             prefixIcon: const Icon(Icons.phone),
           ),
           keyboardType: TextInputType.phone,
           enabled: !authProvider.isLoading,
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _emailController,
+          decoration: InputDecoration(
+            labelText: 'Email',
+            hintText: 'you@example.com',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            prefixIcon: const Icon(Icons.email),
+          ),
+          keyboardType: TextInputType.emailAddress,
+          enabled: !authProvider.isLoading,
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _nameController,
+          decoration: InputDecoration(
+            labelText: 'Full Name',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            prefixIcon: const Icon(Icons.person),
+          ),
+          enabled: !authProvider.isLoading,
+        ),
+        const SizedBox(height: 16),
+        InkWell(
+          onTap: authProvider.isLoading ? null : _pickDob,
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: 'Date of Birth',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              prefixIcon: const Icon(Icons.cake),
+            ),
+            child: Text(
+              _dob == null
+                  ? 'Select date'
+                  : '${_dob!.year}-${_dob!.month.toString().padLeft(2, '0')}-${_dob!.day.toString().padLeft(2, '0')}',
+              style: TextStyle(
+                color: _dob == null ? Colors.grey.shade600 : Colors.black,
+              ),
+            ),
+          ),
         ),
         const SizedBox(height: 24),
         ElevatedButton(
@@ -108,17 +158,21 @@ class _LoginScreenState extends State<LoginScreen> {
               ? null
               : () async {
                   final phone = _phoneController.text.trim();
-                  if (phone.isEmpty) {
+                  final email = _emailController.text.trim();
+                  final name = _nameController.text.trim();
+                  if (phone.isEmpty || email.isEmpty || name.isEmpty || _dob == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please enter your phone number')),
+                      const SnackBar(content: Text('Please fill in all fields')),
                     );
                     return;
                   }
-
-                  final success = await authProvider.sendLoginOTP(phone);
-                  if (success) {
-                    setState(() => _showOTP = true);
-                  }
+                  final success = await authProvider.register(
+                    phone: phone,
+                    email: email,
+                    name: name,
+                    dob: _dob!,
+                  );
+                  if (success) setState(() => _showOTP = true);
                 },
           child: authProvider.isLoading
               ? const SizedBox(
@@ -126,17 +180,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Send OTP'),
+              : const Text('Register'),
         ),
         const SizedBox(height: 12),
         TextButton(
-          onPressed: authProvider.isLoading
-              ? null
-              : () {
-                  authProvider.clearError();
-                  Navigator.of(context).pushNamed('/register');
-                },
-          child: const Text("Don't have an account? Register"),
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Already have an account? Log in'),
         ),
       ],
     );
@@ -147,20 +196,18 @@ class _LoginScreenState extends State<LoginScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Enter OTP sent to ${_phoneController.text}',
+          'Enter the 6-digit code sent to ${_emailController.text}',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: Colors.grey.shade600,
-          ),
+                color: Colors.grey.shade600,
+              ),
         ),
         const SizedBox(height: 24),
         TextField(
           controller: _otpController,
           decoration: InputDecoration(
             labelText: 'OTP',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             prefixIcon: const Icon(Icons.lock),
           ),
           keyboardType: TextInputType.number,
@@ -173,20 +220,23 @@ class _LoginScreenState extends State<LoginScreen> {
               ? null
               : () async {
                   final otp = _otpController.text.trim();
-                  if (otp.isEmpty || otp.length != 6) {
+                  if (otp.length != 6) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Please enter a valid 6-digit OTP')),
                     );
                     return;
                   }
-
-                  await authProvider.verifyLoginOTP(
+                  final success = await authProvider.verifyRegistrationOTP(
                     phone: _phoneController.text.trim(),
                     otp: otp,
                   );
-
-                  if (authProvider.isAuthenticated && mounted) {
-                    Navigator.of(context).pushReplacementNamed('/home');
+                  if (success && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Registration complete! Please log in.'),
+                      ),
+                    );
+                    Navigator.of(context).pop();
                   }
                 },
           child: authProvider.isLoading
@@ -195,12 +245,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   width: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Login'),
+              : const Text('Verify'),
         ),
         const SizedBox(height: 12),
         TextButton(
           onPressed: () => setState(() => _showOTP = false),
-          child: const Text('Change Phone Number'),
+          child: const Text('Edit details'),
         ),
       ],
     );
