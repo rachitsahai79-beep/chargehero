@@ -83,6 +83,7 @@ class AuthService:
             Exception: If the SMTP send fails (caller handles fallback)
         """
         import smtplib
+        import socket
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
 
@@ -109,10 +110,24 @@ class AuthService:
         msg.attach(MIMEText(text_body, "plain"))
         msg.attach(MIMEText(html_body, "html"))
 
-        with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=15) as server:
-            server.starttls()
-            server.login(settings.smtp_user, settings.smtp_password)
-            server.send_message(msg)
+        # Force IPv4 resolution for the SMTP connection. On some PaaS networks
+        # (e.g. Railway) the host advertises IPv6 but has no usable IPv6 route,
+        # causing "[Errno 101] Network is unreachable". We temporarily restrict
+        # getaddrinfo to AF_INET so smtplib connects over IPv4, while TLS still
+        # uses the real hostname for certificate verification.
+        _orig_getaddrinfo = socket.getaddrinfo
+
+        def _ipv4_only(host, port, family=0, type=0, proto=0, flags=0):
+            return _orig_getaddrinfo(host, port, socket.AF_INET, type, proto, flags)
+
+        socket.getaddrinfo = _ipv4_only
+        try:
+            with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as server:
+                server.starttls()
+                server.login(settings.smtp_user, settings.smtp_password)
+                server.send_message(msg)
+        finally:
+            socket.getaddrinfo = _orig_getaddrinfo
 
     def verify_otp(self, phone: str, otp: str) -> bool:
         """Verify OTP and remove from store.
