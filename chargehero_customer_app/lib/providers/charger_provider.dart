@@ -120,15 +120,117 @@ class ChargerProvider with ChangeNotifier {
     }
   }
 
-  /// Fetch customer's tickets.
-  ///
-  /// NOTE: the backend currently exposes only GET /jobs/tickets/{id} (single
-  /// ticket) and no "list my tickets" endpoint. Until that endpoint exists,
-  /// this is a no-op; the Tickets tab shows tickets raised in this session
-  /// (added by [raiseTicket] from the create response).
-  Future<void> fetchTickets(String token) async {
-    // Intentionally no network call - see note above.
+  /// Fetch customer's tickets from the backend (persistent list).
+  Future<void> fetchTickets(String token, String customerId) async {
+    _isLoading = true;
+    _error = null;
     notifyListeners();
+
+    try {
+      final url =
+          Uri.parse('${Config.apiBaseUrl}/jobs/customers/$customerId/tickets');
+      final response = await http.get(
+        url,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List;
+        _tickets = data.map((item) => Ticket.fromJson(item)).toList();
+      } else {
+        _error = 'Failed to fetch tickets';
+      }
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Update an existing charger.
+  Future<bool> updateCharger({
+    required String token,
+    required String customerId,
+    required String chargerId,
+    required String serialNumber,
+    required String model,
+    required String brand,
+    required String address,
+    required double latitude,
+    required double longitude,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final url = Uri.parse('${Config.apiBaseUrl}/jobs/chargers/$chargerId');
+      final response = await http.put(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'serial_number': serialNumber,
+          'model': model,
+          'brand': brand,
+          'address': address,
+          'latitude': latitude,
+          'longitude': longitude,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        await fetchChargers(token, customerId);
+        return true;
+      } else {
+        final data = jsonDecode(response.body);
+        _error = data['detail'] ?? 'Failed to update charger';
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Delete a charger.
+  Future<bool> deleteCharger({
+    required String token,
+    required String customerId,
+    required String chargerId,
+  }) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      final url = Uri.parse('${Config.apiBaseUrl}/jobs/chargers/$chargerId');
+      final response = await http.delete(
+        url,
+        headers: {'Authorization': 'Bearer $token'},
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        _chargers.removeWhere((c) => c.id == chargerId);
+        return true;
+      } else {
+        final data = jsonDecode(response.body);
+        _error = data['detail'] ?? 'Failed to delete charger';
+        return false;
+      }
+    } catch (e) {
+      _error = e.toString();
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   /// Raise a new ticket

@@ -4,9 +4,11 @@ import 'providers/auth_provider.dart';
 import 'providers/charger_provider.dart';
 import 'providers/ticket_tracking_provider.dart';
 import 'providers/checklist_provider.dart';
+import 'providers/admin_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/dashboard_screen.dart';
+import 'screens/admin_screen.dart';
 
 void main() {
   runApp(const ChargeHeroCustomerApp());
@@ -23,6 +25,7 @@ class ChargeHeroCustomerApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ChargerProvider()),
         ChangeNotifierProvider(create: (_) => TicketTrackingProvider()),
         ChangeNotifierProvider(create: (_) => ChecklistProvider()),
+        ChangeNotifierProvider(create: (_) => AdminProvider()),
       ],
       child: MaterialApp(
         title: 'ChargeHero Customer',
@@ -41,6 +44,7 @@ class ChargeHeroCustomerApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
           '/home': (context) => const DashboardScreen(),
+          '/admin': (context) => const AdminScreen(),
         },
       ),
     );

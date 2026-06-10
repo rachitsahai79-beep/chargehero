@@ -28,7 +28,7 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
 
       if (authProvider.token != null && authProvider.user != null) {
         chargerProvider.fetchChargers(authProvider.token!, authProvider.user!.id);
-        chargerProvider.fetchTickets(authProvider.token!);
+        chargerProvider.fetchTickets(authProvider.token!, authProvider.user!.id);
       }
     });
   }
@@ -46,6 +46,12 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
         title: const Text('ChargeHero'),
         elevation: 0,
         actions: [
+          if (context.watch<AuthProvider>().user?.role == 'admin')
+            IconButton(
+              icon: const Icon(Icons.admin_panel_settings),
+              tooltip: 'Admin',
+              onPressed: () => Navigator.of(context).pushNamed('/admin'),
+            ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () {
@@ -141,20 +147,67 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   Text(charger.address),
                 ],
               ),
-              trailing: Chip(
-                label: Text(charger.status),
-                backgroundColor: charger.status == 'active'
-                    ? Colors.green.shade100
-                    : Colors.grey.shade100,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Chip(
+                    label: Text(charger.status),
+                    backgroundColor: charger.status == 'active'
+                        ? Colors.green.shade100
+                        : Colors.grey.shade100,
+                  ),
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        _showEditChargerDialog(charger);
+                      } else if (value == 'delete') {
+                        _confirmDeleteCharger(charger);
+                      }
+                    },
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(value: 'edit', child: Text('Edit')),
+                      PopupMenuItem(value: 'delete', child: Text('Delete')),
+                    ],
+                  ),
+                ],
               ),
-              onTap: () {
-                // Navigate to charger details
-              },
             ),
           );
         },
       ),
     );
+  }
+
+  Future<void> _confirmDeleteCharger(Charger charger) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete charger?'),
+        content: Text('${charger.brand} ${charger.model} (SN: ${charger.serialNumber})'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final auth = context.read<AuthProvider>();
+    final chargerProvider = context.read<ChargerProvider>();
+    final ok = await chargerProvider.deleteCharger(
+      token: auth.token!,
+      customerId: auth.user!.id,
+      chargerId: charger.id,
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ok ? 'Charger deleted' : (chargerProvider.error ?? 'Delete failed'))),
+      );
+    }
   }
 
   Widget _buildTicketsTab(ChargerProvider chargerProvider, AuthProvider authProvider) {
@@ -188,7 +241,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     }
 
     return RefreshIndicator(
-      onRefresh: () => chargerProvider.fetchTickets(authProvider.token!),
+      onRefresh: () =>
+          chargerProvider.fetchTickets(authProvider.token!, authProvider.user!.id),
       child: ListView.builder(
         padding: const EdgeInsets.all(12),
         itemCount: chargerProvider.tickets.length,
@@ -228,6 +282,127 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             ),
           );
         },
+      ),
+    );
+  }
+
+  void _showEditChargerDialog(Charger charger) {
+    final serialController = TextEditingController(text: charger.serialNumber);
+    final modelController = TextEditingController(text: charger.model);
+    final brandController = TextEditingController(text: charger.brand);
+    final addressController = TextEditingController(text: charger.address);
+    final latController =
+        TextEditingController(text: charger.latitude.toStringAsFixed(6));
+    final lngController =
+        TextEditingController(text: charger.longitude.toStringAsFixed(6));
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          title: const Text('Edit Charger'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _field(serialController, 'Serial Number'),
+                const SizedBox(height: 12),
+                _field(brandController, 'Brand'),
+                const SizedBox(height: 12),
+                _field(modelController, 'Model'),
+                const SizedBox(height: 12),
+                _field(addressController, 'Address', maxLines: 2),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.location_on),
+                  label: const Text('Change location on map'),
+                  onPressed: () async {
+                    LatLng? initial;
+                    final la = double.tryParse(latController.text.trim());
+                    final lo = double.tryParse(lngController.text.trim());
+                    if (la != null && lo != null) initial = LatLng(la, lo);
+                    final result = await Navigator.of(dialogContext).push<LatLng>(
+                      MaterialPageRoute(
+                        builder: (_) => LocationPickerScreen(initial: initial),
+                      ),
+                    );
+                    if (result != null) {
+                      setDialogState(() {
+                        latController.text = result.latitude.toStringAsFixed(6);
+                        lngController.text = result.longitude.toStringAsFixed(6);
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(child: _field(latController, 'Latitude', number: true)),
+                    const SizedBox(width: 12),
+                    Expanded(child: _field(lngController, 'Longitude', number: true)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final lat = double.tryParse(latController.text.trim());
+                final lng = double.tryParse(lngController.text.trim());
+                if (lat == null || lng == null) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(content: Text('Enter valid latitude/longitude')),
+                  );
+                  return;
+                }
+                final auth = context.read<AuthProvider>();
+                final chargerProvider = context.read<ChargerProvider>();
+                final ok = await chargerProvider.updateCharger(
+                  token: auth.token!,
+                  customerId: auth.user!.id,
+                  chargerId: charger.id,
+                  serialNumber: serialController.text.trim(),
+                  model: modelController.text.trim(),
+                  brand: brandController.text.trim(),
+                  address: addressController.text.trim(),
+                  latitude: lat,
+                  longitude: lng,
+                );
+                if (ok && mounted) {
+                  Navigator.pop(dialogContext);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Charger updated')),
+                  );
+                } else if (mounted) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    SnackBar(content: Text(chargerProvider.error ?? 'Update failed')),
+                  );
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _field(TextEditingController c, String label,
+      {int maxLines = 1, bool number = false}) {
+    return TextField(
+      controller: c,
+      maxLines: maxLines,
+      keyboardType: number
+          ? const TextInputType.numberWithOptions(decimal: true, signed: true)
+          : TextInputType.text,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
