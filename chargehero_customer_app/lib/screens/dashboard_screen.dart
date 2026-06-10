@@ -237,7 +237,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
     final modelController = TextEditingController();
     final brandController = TextEditingController();
     final addressController = TextEditingController();
-    LatLng? pickedLocation;
+    final latController = TextEditingController();
+    final lngController = TextEditingController();
 
     showDialog(
       context: context,
@@ -283,21 +284,57 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.location_on),
-                  label: Text(
-                    pickedLocation == null
-                        ? 'Pick location on map'
-                        : 'Location: ${pickedLocation!.latitude.toStringAsFixed(4)}, ${pickedLocation!.longitude.toStringAsFixed(4)}',
-                  ),
+                  label: const Text('Pick location on map'),
                   onPressed: () async {
+                    LatLng? initial;
+                    final lat = double.tryParse(latController.text.trim());
+                    final lng = double.tryParse(lngController.text.trim());
+                    if (lat != null && lng != null) initial = LatLng(lat, lng);
                     final result = await Navigator.of(dialogContext).push<LatLng>(
                       MaterialPageRoute(
-                        builder: (_) => LocationPickerScreen(initial: pickedLocation),
+                        builder: (_) => LocationPickerScreen(initial: initial),
                       ),
                     );
                     if (result != null) {
-                      setDialogState(() => pickedLocation = result);
+                      // Push the selected lat/lng into the visible form fields.
+                      setDialogState(() {
+                        latController.text = result.latitude.toStringAsFixed(6);
+                        lngController.text = result.longitude.toStringAsFixed(6);
+                      });
                     }
                   },
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: latController,
+                        decoration: InputDecoration(
+                          labelText: 'Latitude',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                          signed: true,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: lngController,
+                        decoration: InputDecoration(
+                          labelText: 'Longitude',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                          signed: true,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -309,9 +346,13 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
             ),
             ElevatedButton(
               onPressed: () async {
-                if (pickedLocation == null) {
+                final lat = double.tryParse(latController.text.trim());
+                final lng = double.tryParse(lngController.text.trim());
+                if (lat == null || lng == null) {
                   ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(content: Text('Please pick the charger location on the map')),
+                    const SnackBar(
+                      content: Text('Pick a location on the map or enter latitude/longitude'),
+                    ),
                   );
                   return;
                 }
@@ -325,8 +366,8 @@ class _DashboardScreenState extends State<DashboardScreen> with TickerProviderSt
                   model: modelController.text.trim(),
                   brand: brandController.text.trim(),
                   address: addressController.text.trim(),
-                  latitude: pickedLocation!.latitude,
-                  longitude: pickedLocation!.longitude,
+                  latitude: lat,
+                  longitude: lng,
                 );
 
                 if (success && mounted) {
