@@ -33,10 +33,10 @@ async def create_charger(
 ):
     """
     Create a new charger.
-    Only customers can create chargers.
+    Customers and admins can create chargers.
     """
-    if current_user.get('role') != 'customer':
-        raise HTTPException(status_code=403, detail="Only customers can create chargers")
+    if current_user.get('role') not in ('customer', 'admin'):
+        raise HTTPException(status_code=403, detail="Only customers or admins can create chargers")
 
     try:
         service = JobsService(db)
@@ -94,6 +94,82 @@ async def list_customer_chargers(
     except Exception as e:
         logger.error(f"Error listing chargers: {e}")
         raise HTTPException(status_code=500, detail="Failed to list chargers")
+
+
+@router.put("/chargers/{charger_id}", response_model=ChargerResponse)
+async def update_charger(
+    charger_id: str,
+    request: ChargerRequest,
+    current_user = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """Update a charger. Owner customer or an admin only."""
+    try:
+        service = JobsService(db)
+        charger = service.get_charger(charger_id)
+        if not charger:
+            raise HTTPException(status_code=404, detail="Charger not found")
+
+        role = current_user.get('role')
+        if role not in ('customer', 'admin'):
+            raise HTTPException(status_code=403, detail="Unauthorized")
+        if role == 'customer' and charger.get('customer_id') != current_user['user_id']:
+            raise HTTPException(status_code=403, detail="Unauthorized")
+
+        updated = service.update_charger(charger_id, request.model_dump())
+        if not updated:
+            raise HTTPException(status_code=500, detail="Failed to update charger")
+        return updated
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating charger: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update charger")
+
+
+@router.delete("/chargers/{charger_id}")
+async def delete_charger(
+    charger_id: str,
+    current_user = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """Delete a charger. Owner customer or an admin only."""
+    try:
+        service = JobsService(db)
+        charger = service.get_charger(charger_id)
+        if not charger:
+            raise HTTPException(status_code=404, detail="Charger not found")
+
+        role = current_user.get('role')
+        if role not in ('customer', 'admin'):
+            raise HTTPException(status_code=403, detail="Unauthorized")
+        if role == 'customer' and charger.get('customer_id') != current_user['user_id']:
+            raise HTTPException(status_code=403, detail="Unauthorized")
+
+        service.delete_charger(charger_id)
+        return {"status": "deleted", "id": charger_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting charger: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete charger")
+
+
+@router.get("/customers/{customer_id}/tickets", response_model=List[TicketResponse])
+async def list_customer_tickets(
+    customer_id: str,
+    current_user = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """List all tickets raised by a customer."""
+    if current_user.get('role') == 'customer' and customer_id != current_user['user_id']:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+    try:
+        service = JobsService(db)
+        return service.list_customer_tickets(customer_id)
+    except Exception as e:
+        logger.error(f"Error listing customer tickets: {e}")
+        raise HTTPException(status_code=500, detail="Failed to list tickets")
 
 
 # ============================================================================

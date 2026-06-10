@@ -31,7 +31,8 @@ class JobsService:
                 'model': data['model'],
                 'brand': data['brand'],
                 'address': data['address'],
-                'location': f"POINT({data['longitude']} {data['latitude']})",
+                'latitude': data['latitude'],
+                'longitude': data['longitude'],
                 'status': data.get('status', 'active')
             }).execute()
 
@@ -60,6 +61,48 @@ class JobsService:
         except Exception as e:
             logger.error(f"Error listing chargers for customer {customer_id}: {e}")
             return []
+
+    def list_all_chargers(self) -> List[Dict[str, Any]]:
+        """List every charger (admin view)."""
+        try:
+            response = self.db.table('jobs_chargers').select('*').order(
+                'created_at', desc=True
+            ).execute()
+            return response.data or []
+        except Exception as e:
+            logger.error(f"Error listing all chargers: {e}")
+            return []
+
+    def update_charger(self, charger_id: str, data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update an existing charger."""
+        try:
+            update = {
+                'serial_number': data['serial_number'],
+                'model': data['model'],
+                'brand': data['brand'],
+                'address': data['address'],
+                'latitude': data['latitude'],
+                'longitude': data['longitude'],
+                'status': data.get('status', 'active'),
+                'updated_at': datetime.utcnow().isoformat(),
+            }
+            response = self.db.table('jobs_chargers').update(update).eq(
+                'id', charger_id
+            ).execute()
+            return response.data[0] if response.data else None
+        except Exception as e:
+            logger.error(f"Error updating charger {charger_id}: {e}")
+            raise
+
+    def delete_charger(self, charger_id: str) -> bool:
+        """Delete a charger by ID."""
+        try:
+            self.db.table('jobs_chargers').delete().eq('id', charger_id).execute()
+            logger.info(f"Deleted charger {charger_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error deleting charger {charger_id}: {e}")
+            raise
 
     # ========================================================================
     # Ticket Operations
@@ -121,6 +164,17 @@ class JobsService:
             return response.data or []
         except Exception as e:
             logger.error(f"Error listing tickets for engineer {engineer_id}: {e}")
+            return []
+
+    def list_customer_tickets(self, customer_id: str) -> List[Dict[str, Any]]:
+        """List all tickets raised by a customer (newest first)."""
+        try:
+            response = self.db.table('jobs_tickets').select('*').eq(
+                'customer_id', customer_id
+            ).order('created_at', desc=True).execute()
+            return response.data or []
+        except Exception as e:
+            logger.error(f"Error listing tickets for customer {customer_id}: {e}")
             return []
 
     def update_ticket_status(self, ticket_id: str, status: str, notes: Optional[str] = None) -> Optional[Dict[str, Any]]:

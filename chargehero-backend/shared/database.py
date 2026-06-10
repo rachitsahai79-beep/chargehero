@@ -82,6 +82,15 @@ class SupabaseDB:
         """Get the service role Supabase client for admin operations."""
         return self.service_client
 
+    def table(self, name: str):
+        """Convenience proxy to the service-role client's table() builder.
+
+        Backend services call ``db.table('...')`` directly for data access.
+        The service-role client bypasses RLS; route handlers enforce
+        authorization via the JWT (get_current_user) before reaching here.
+        """
+        return self.service_client.table(name)
+
     def execute_sql(self, query: str, params: dict = None) -> dict:
         """
         Execute raw SQL query against the database.

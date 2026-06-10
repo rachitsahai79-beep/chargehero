@@ -8,6 +8,8 @@ from domains.admin.admin_models import (
     EngineerCertificationRequest, RevenueReportResponse
 )
 from domains.admin.admin_service import AdminService
+from domains.jobs.service import JobsService
+from domains.jobs.models import ChargerResponse
 from domains.auth.dependencies import get_current_user
 from shared.database import get_db
 
@@ -20,6 +22,21 @@ def _require_admin(current_user):
     if current_user.get('role') != 'admin':
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
+
+
+@router.get("/admin/chargers", response_model=list[ChargerResponse])
+async def list_all_chargers(
+    current_user = Depends(get_current_user),
+    db = Depends(get_db)
+):
+    """List every charger across all customers (admin only)."""
+    _require_admin(current_user)
+    try:
+        service = JobsService(db)
+        return service.list_all_chargers()
+    except Exception as e:
+        logger.error(f"Error listing all chargers: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch chargers")
 
 
 @router.get("/admin/engineers", response_model=list[EngineerListItem])
